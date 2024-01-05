@@ -170,6 +170,13 @@ class _IpInputFormState extends State<IpInputForm> {
                         final int intValue = int.parse(pt);
 
                         setState(() {
+                          if (_chartData.length >= 20) {
+                            // limit the length of chart
+                            _chartData.removeAt(0);
+                            _chartData2.removeAt(0);
+                            _timeData.removeAt(0);
+                          }
+                          // add new data to chart
                           _chartData.add(FlSpot(_chartData.length.toDouble(),
                               intValue.toDouble()));
                           _chartData2.add(FlSpot(_chartData2.length.toDouble(),
