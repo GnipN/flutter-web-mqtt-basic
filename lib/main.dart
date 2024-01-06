@@ -1,16 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:mqtt_client/mqtt_browser_client.dart';
-import 'package:mqtt_client/mqtt_client.dart';
-
-// for fl_chart
-import 'package:fl_chart/fl_chart.dart';
-// import 'package:fl_chart_app/cubits/app/app_cubit.dart';
-// import 'package:fl_chart_app/presentation/resources/app_resources.dart';
-// import 'package:flutter_bloc/flutter_bloc.dart';
-// import 'package:google_fonts/google_fonts.dart';
-
-// import 'presentation/router/app_router.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MyApp());
@@ -22,243 +14,153 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MQTT IP Input',
+      title: 'User Input',
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Enter MQTT Broker IP'),
+          title: const Text('IoT basic login'),
         ),
-        body: const IpInputForm(),
+        body: LoginForm(),
       ),
     );
   }
 }
 
-class IpInputForm extends StatefulWidget {
-  const IpInputForm({Key? key}) : super(key: key);
-
+class LoginForm extends StatefulWidget {
   @override
-  _IpInputFormState createState() => _IpInputFormState();
+  _LoginFormState createState() => _LoginFormState();
 }
 
-class _IpInputFormState extends State<IpInputForm> {
-  MqttBrowserClient? client; // Define client at the class level
+class _LoginFormState extends State<LoginForm> {
   final _formKey = GlobalKey<FormState>();
-  final _ipController = TextEditingController(text: 'ws://192.168.243.251');
-  final _topicController = TextEditingController(
-      text: 'test/topic'); // Replace 'test/topic' with your default topic
-  final _messageController = TextEditingController();
-  String _latestMessage = '';
-  String _connectionStatus = '';
-  String _subscribeStatus = '';
-  bool _isConnected = false;
-  final List<FlSpot> _chartData = [FlSpot(0, 0)]; // data for 1st chart
-  final List<FlSpot> _chartData2 = [FlSpot(0, 0)]; // data for 2nd chart
-  final List<DateTime> _timeData = [DateTime.now()]; // data for time
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final String _ip = '192.168.1.103:3000';
+  String _serverMessage = '';
+  String _token = '';
 
   @override
   Widget build(BuildContext context) {
-    final double maxY = _chartData
-        .map((spot) => spot.y)
-        .reduce((value, element) => value > element ? value : element);
-
     return Form(
       key: _formKey,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: <Widget>[
-            TextFormField(
-              controller: _ipController,
-              decoration: const InputDecoration(
-                labelText: 'Enter IP',
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter an IP';
-                }
-                return null;
-              },
-            ),
-            TextFormField(
-              controller: _topicController,
-              decoration: const InputDecoration(
-                labelText: 'Enter Topic',
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a topic';
-                }
-                return null;
-              },
-            ),
-            TextFormField(
-              controller: _messageController,
-              decoration: const InputDecoration(
-                labelText: 'Enter Message',
-              ),
-              // validator: (value) {
-              //   if (value == null || value.isEmpty) {
-              //     return 'Please enter a message';
-              //   }
-              //   return null;
-              // },
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (_formKey.currentState!.validate()) {
-                  if (kDebugMode) {
-                    print('IP: ${_ipController.text}');
-                  }
-                  // Here you can add the code to connect to the MQTT broker
-                  client =
-                      MqttBrowserClient(_ipController.text, 'flutter_client');
-                  // ip should looklike 'ws://192.168.243.251'
-                  // !!! importance must add 'ws://' before ip !!!
-                  client?.port =
-                      9001; // Change this if your broker is not running on port 1883
-                  client?.keepAlivePeriod = 20;
-                  try {
-                    await client?.connect();
-                  } catch (e) {
-                    if (kDebugMode) {
-                      print('Exception: $e');
-                    }
-                    client?.disconnect();
-                  }
+      child: Column(
+        children: <Widget>[
+          TextFormField(
+            controller: _usernameController,
+            decoration: InputDecoration(labelText: 'Username'),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your username';
+              }
+              return null;
+            },
+          ),
+          TextFormField(
+            controller: _passwordController,
+            decoration: InputDecoration(labelText: 'Password'),
+            obscureText: true,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your password';
+              }
+              return null;
+            },
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: <Widget>[
+              ElevatedButton(
+                onPressed: () async {
+                  if (_formKey.currentState!.validate()) {
+                    // Handle login
+                    try {
+                      final response = await http.post(
+                        Uri.parse('http://$_ip/login'),
+                        headers: <String, String>{
+                          'Content-Type': 'application/json; charset=UTF-8',
+                        },
+                        body: jsonEncode(<String, String>{
+                          'usr': _usernameController.text,
+                          'pass': _passwordController.text,
+                        }),
+                      );
 
-                  if (client?.connectionStatus!.state ==
-                      MqttConnectionState.connected) {
-                    if (kDebugMode) {
-                      print('MQTT client connected');
-                    }
-                    setState(() {
-                      _connectionStatus = 'Connected';
-                      _isConnected = true;
-                    });
-                  } else {
-                    if (kDebugMode) {
-                      print('ERROR: MQTT client connection failed - '
-                          'disconnecting, status is ${client?.connectionStatus}');
-                    }
-                    setState(() {
-                      _connectionStatus = 'Connection failed';
-                      _isConnected = false;
-                    });
-                    client?.disconnect();
-                  }
-                }
-              },
-              child: const Text('Connect'),
-            ),
-            ElevatedButton(
-              onPressed: _isConnected
-                  ? () {
-                      final topic = _topicController.text;
-                      client?.subscribe(topic, MqttQos.atLeastOnce);
+                      // Parse the JSON response
+                      Map<String, dynamic> jsonResponse =
+                          jsonDecode(response.body);
+
+                      // Set the server message
                       setState(() {
-                        _subscribeStatus = 'Subscribed to $topic';
+                        _serverMessage = jsonResponse['message'] ??
+                            'No message received from the server';
+                        ;
                       });
 
-                      client?.updates!
-                          .listen((List<MqttReceivedMessage<MqttMessage>> c) {
-                        final MqttPublishMessage recMess =
-                            c[0].payload as MqttPublishMessage;
-                        final String pt =
-                            MqttPublishPayload.bytesToStringAsString(
-                                recMess.payload.message!);
-
-                        final int intValue = int.parse(pt);
-
-                        setState(() {
-                          if (_chartData.length >= 20) {
-                            // limit the length of chart
-                            _chartData.removeAt(0);
-                            _chartData2.removeAt(0);
-                            _timeData.removeAt(0);
-                          }
-                          // add new data to chart
-                          _chartData.add(FlSpot(_chartData.length.toDouble(),
-                              intValue.toDouble()));
-                          _chartData2.add(FlSpot(_chartData2.length.toDouble(),
-                              intValue.toDouble() + 100));
-                          _timeData.add(DateTime.now());
-                          _latestMessage =
-                              'Received message:$pt from topic: ${c[0].topic}>';
-                          if (kDebugMode) {
-                            print(_chartData);
-                          }
-                        });
-                      });
+                      if (response.statusCode == 200) {
+                        // If the server returns a 200 OK response,
+                        // then parse the JSON.
+                        _token = jsonResponse['token'] ?? '';
+                        print('Login successful: ${response.body}');
+                      } else {
+                        // If the server returns an unsuccessful response code,
+                        print('Login failed: ${response.body}');
+                      }
+                    } catch (e) {
+                      print('Failed to send login request: $e');
                     }
-                  : null,
-              child: const Text('Subscribe'),
-            ),
-            ElevatedButton(
-              onPressed: _isConnected
-                  ? () {
-                      final topic = _topicController.text;
-                      final message = _messageController.text;
-                      final MqttClientPayloadBuilder builder =
-                          MqttClientPayloadBuilder();
-                      builder.addString(message);
-                      client?.publishMessage(
-                          topic, MqttQos.atLeastOnce, builder.payload!);
-                    }
-                  : null,
-              child: const Text('Publish'),
-            ),
-            Text(_connectionStatus),
-            Text(_subscribeStatus),
-            Text(_latestMessage), // Display the latest message
-            Expanded(
-              child: LineChart(
-                LineChartData(
-                  // minY: 0,
-                  // maxY: 3000,
-                  titlesData: FlTitlesData(
-                    leftTitles: SideTitles(
-                      showTitles: true,
-                      getTitles: (value) {
-                        if (value == 0) {
-                          return '0';
-                        } else if (value == maxY) {
-                          return '${maxY.toInt()}';
-                        } else {
-                          return '';
-                        }
-                      },
-                    ),
-                    bottomTitles: SideTitles(
-                      showTitles: true,
-                      getTitles: (value) {
-                        if (value.toInt() < _timeData.length) {
-                          final time = _timeData[value.toInt()];
-                          return '${time.hour}:${time.minute}:${time.second}';
-                        } else {
-                          return '';
-                        }
-                      },
-                    ),
-                  ),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: _chartData,
-                      isCurved: true,
-                      colors: [Colors.blue],
-                      barWidth: 2,
-                    ),
-                    LineChartBarData(
-                      spots: _chartData2,
-                      isCurved: true,
-                      colors: [Colors.red],
-                      barWidth: 2,
-                    ),
-                  ],
-                ),
+                  }
+                },
+                child: Text('Login'),
               ),
-            ),
-          ],
-        ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (_formKey.currentState!.validate()) {
+                    // Handle signup
+                    try {
+                      // need to Enable CORS on the server
+                      final response = await http.post(
+                        Uri.parse('http://$_ip/signup'),
+                        headers: <String, String>{
+                          'Content-Type': 'application/json; charset=UTF-8',
+                        },
+                        body: jsonEncode(<String, String>{
+                          'usr': _usernameController.text,
+                          'pass': _passwordController.text,
+                        }),
+                      );
+
+// Parse the JSON response
+                      Map<String, dynamic> jsonResponse =
+                          jsonDecode(response.body);
+
+                      // Set the server message
+                      setState(() {
+                        _serverMessage = jsonResponse['message'] ??
+                            'No message received from the server';
+                        ;
+                      });
+                      if (response.statusCode == 200) {
+                        // If the server returns a 200 OK response,
+                        // then parse the JSON.
+                        print('Signup successful: ${response.body}');
+                      } else {
+                        // If the server returns an unsuccessful response code,
+                        print('Signup failed: ${response.body}');
+                      }
+                    } catch (e) {
+                      print('Failed to send signup request: $e');
+                    }
+                  }
+                },
+                child: Text('Signup'),
+              ),
+            ],
+          ),
+          Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: <Widget>[
+                Text(_serverMessage),
+              ]),
+        ],
       ),
     );
   }
