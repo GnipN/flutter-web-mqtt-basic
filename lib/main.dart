@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'user_home_page.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -36,7 +38,8 @@ class _LoginFormState extends State<LoginForm> {
   final _passwordController = TextEditingController();
   final String _ip = '192.168.1.103:3000';
   String _serverMessage = '';
-  String _token = '';
+  String _jwtToken = '';
+  String _iotToken = '';
 
   @override
   Widget build(BuildContext context) {
@@ -98,8 +101,19 @@ class _LoginFormState extends State<LoginForm> {
                       if (response.statusCode == 200) {
                         // If the server returns a 200 OK response,
                         // then parse the JSON.
-                        _token = jsonResponse['token'] ?? '';
+                        _jwtToken = jsonResponse['jwtToken'] ?? '';
+                        _iotToken = jsonResponse['iotToken'] ?? '';
                         print('Login successful: ${response.body}');
+
+                        // Navigate to the UserHomePage
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => UserHomePage(
+                                  usr: _usernameController.text,
+                                  jwtToken: _jwtToken,
+                                  iotToken: _iotToken)),
+                        );
                       } else {
                         // If the server returns an unsuccessful response code,
                         print('Login failed: ${response.body}');
