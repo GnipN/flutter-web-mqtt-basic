@@ -34,7 +34,7 @@ class _LoginFormState extends State<LoginForm> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  final String _ip = '192.168.1.103:3000';
+  final String _ip = '192.168.74.251:3000';
   String _serverMessage = '';
   String _token = '';
 
